@@ -1,0 +1,7 @@
+{
+  "scenario": "unbacked_memory",
+  "description": "User space process containing executable MEM_PRIVATE page without on-disk file backing",
+  "expected_detection": true,
+  "expected_technique": "T1055",
+  "ground_truth": "synthetic_injection"
+}

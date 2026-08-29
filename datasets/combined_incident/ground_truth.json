@@ -1,0 +1,7 @@
+{
+  "scenario": "combined_incident",
+  "description": "Multi-stage intrusion combining BYOVD driver load, unbacked reflective injection, and fronted C2",
+  "expected_detection": true,
+  "expected_technique": "T1068+T1055",
+  "ground_truth": "synthetic_attack_chain"
+}

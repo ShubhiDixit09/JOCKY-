@@ -1,0 +1,9 @@
+case "TEST-VALID-01" description "Valid process query";
+
+capabilities {
+    grant process.read;
+    grant evidence.export;
+}
+
+query procs = host.processes();
+evidence.export(procs, format=CASE_JSON_LD);

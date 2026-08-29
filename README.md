@@ -26,43 +26,68 @@
 │   ├── jocky-ast/                # Abstract Syntax Tree & Type definitions
 │   ├── jocky-parser/             # Logos lexer & Pratt expression parser
 │   ├── jocky-ir/                 # SSA IR, capability verifier, filter pushdown
+│   ├── jocky-compiler/           # TypeChecker & pure-Rust Wasm bytecode emitter
+│   ├── jocky-agent/              # Windows & Linux collectors + Wasm sandbox runner
 │   ├── jocky-crypto/             # Merkle tree, evidence packaging, CASE/STIX
-│   ├── jocky-agent/              # Windows & Linux native forensic collectors
 │   ├── jocky-lab/                # Benign laboratory adversary emulation
+│   ├── jocky-tests/              # Comprehensive integration test suite (Tests A-F)
 │   └── jocky-cli/                # Command line interface & compiler runner
 ├── docs/
 │   ├── GRAMMAR.ebnf              # Formal EBNF language grammar
 │   ├── LITERATURE_REVIEW.md      # Annotated review of 10 peer-reviewed papers
 │   └── ARCHITECTURE_SPECIFICATION.md # Full 16-section technical architecture
-└── examples/
-    ├── detect_byovd.jky          # BYOVD detection script
-    ├── detect_unbacked_memory.jky# Memory injection detection script
-    └── correlate_incident.jky    # Multi-stage temporal correlation script
+├── datasets/                     # Ground-truth benchmark datasets
+│   ├── baseline/
+│   ├── vulnerable_driver/
+│   ├── unbacked_memory/
+│   ├── sni_mismatch/
+│   ├── telemetry_gap/
+│   └── combined_incident/
+├── examples/
+│   ├── detect_byovd.jky          # BYOVD detection script
+│   ├── detect_unbacked_memory.jky# Memory injection detection script
+│   └── correlate_incident.jky    # Multi-stage temporal correlation script
+├── paper/
+│   └── jocky-paper.tex           # Complete academic research paper draft
+└── scripts/
+    ├── reproduce.ps1             # One-click Windows PowerShell reproduction
+    └── reproduce.sh              # One-click POSIX Bash reproduction
 ```
 
 ---
 
 ## CLI Usage
 
-### 1. Check & Validate a JOCKY Script
+### 1. Compile JOCKY Script to WebAssembly (.wasm & .wat)
 ```bash
-cargo run --bin jocky -- check examples/detect_byovd.jky
+cargo run --bin jocky -- compile examples/detect_byovd.jky --emit-wat
 ```
 
-### 2. Audit Capabilities Requested
-```bash
-cargo run --bin jocky -- audit examples/detect_unbacked_memory.jky
-```
-
-### 3. Run Investigation Query & Export CASE JSON-LD Evidence
+### 2. Run End-to-End Investigation (Source -> Wasm -> Sandbox -> Evidence)
 ```bash
 cargo run --bin jocky -- run examples/detect_byovd.jky
 ```
 
-### 4. Execute Safe Laboratory Adversary Emulation
+### 3. Cryptographically Verify Evidence Package Integrity
 ```bash
-cargo run --bin jocky -- lab-simulate
+cargo run --bin jocky -- verify evidence_INC-BYOVD-001.json
 ```
+
+### 4. Audit Capabilities Requested
+```bash
+cargo run --bin jocky -- audit examples/detect_unbacked_memory.jky
+```
+
+### 5. Run Quantitative Detection Benchmark Harness
+```bash
+cargo run --bin jocky -- evaluate --dataset-dir datasets
+```
+
+### 6. One-Click Academic Reproduction Pipeline
+```powershell
+./scripts/reproduce.ps1
+```
+*(or `./scripts/reproduce.sh` on Linux)*
 
 ---
 

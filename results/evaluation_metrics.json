@@ -1,0 +1,10 @@
+{
+  "avg_detection_latency_us": 0,
+  "f1_score": 1.0,
+  "fn": 0,
+  "fp": 0,
+  "precision": 1.0,
+  "recall": 1.0,
+  "tn": 1,
+  "tp": 5
+}

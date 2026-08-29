@@ -1,0 +1,3 @@
+case "TEST-BAD-01"
+// Missing semicolon and missing braces
+capabilities grant process.read;

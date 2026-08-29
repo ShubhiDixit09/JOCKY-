@@ -16,6 +16,7 @@ jocky-ir = { path = "../jocky-ir" }
 jocky-crypto = { path = "../jocky-crypto" }
 jocky-agent = { path = "../jocky-agent" }
 jocky-lab = { path = "../jocky-lab" }
+jocky-compiler = { path = "../jocky-compiler" }
 clap = { workspace = true }
 colored = { workspace = true }
 serde = { workspace = true }

@@ -1,0 +1,7 @@
+{
+  "scenario": "vulnerable_driver",
+  "description": "Exploitation of signed vulnerable driver CVE-2018-19320 (gdrv.sys) cataloged in LOLDrivers",
+  "expected_detection": true,
+  "expected_technique": "T1068",
+  "ground_truth": "synthetic_byovd"
+}

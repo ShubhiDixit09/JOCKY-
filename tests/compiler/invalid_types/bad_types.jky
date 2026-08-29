@@ -1,0 +1,14 @@
+case "TEST-BAD-TYPE" description "Invalid condition type in detect block";
+
+capabilities {
+    grant process.read;
+}
+
+query procs = host.processes();
+
+detect bad_rule on procs {
+    technique: "T1055",
+    severity: HIGH,
+    condition: 12345,
+    rationale: "Condition is an integer instead of a boolean"
+}

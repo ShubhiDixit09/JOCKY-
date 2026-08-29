@@ -1,0 +1,15 @@
+[package]
+name = "jocky-compiler"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+jocky-ast = { path = "../jocky-ast" }
+jocky-parser = { path = "../jocky-parser" }
+jocky-ir = { path = "../jocky-ir" }
+jocky-crypto = { path = "../jocky-crypto" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

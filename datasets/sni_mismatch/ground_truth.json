@@ -1,0 +1,7 @@
+{
+  "scenario": "sni_mismatch",
+  "description": "Network traffic exhibiting TLS ClientHello SNI header divergence from inner HTTP Host header",
+  "expected_detection": true,
+  "expected_technique": "T1071.001",
+  "ground_truth": "synthetic_domain_fronting"
+}

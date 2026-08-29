@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use thiserror::Error;
 
+pub mod wasm_runner;
+pub use wasm_runner::{WasmExecutionError, WasmExecutionResult, WasmSandboxRunner};
+
 #[derive(Error, Debug)]
 pub enum AgentError {
     #[error("Capability Denied: Agent does not possess capability '{0}'")]

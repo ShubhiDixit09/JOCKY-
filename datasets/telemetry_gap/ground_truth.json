@@ -1,0 +1,7 @@
+{
+  "scenario": "telemetry_gap",
+  "description": "Suspicious absence of Sysmon/Defender eventlog telemetry while host machine is actively running",
+  "expected_detection": true,
+  "expected_technique": "T1562.001",
+  "ground_truth": "synthetic_telemetry_gap"
+}

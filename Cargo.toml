@@ -6,6 +6,8 @@ members = [
     "crates/jocky-crypto",
     "crates/jocky-agent",
     "crates/jocky-lab",
+    "crates/jocky-compiler",
+    "crates/jocky-tests",
     "crates/jocky-cli",
 ]
 resolver = "2"

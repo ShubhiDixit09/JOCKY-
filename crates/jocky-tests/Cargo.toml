@@ -1,0 +1,17 @@
+[package]
+name = "jocky-tests"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+jocky-ast = { path = "../jocky-ast" }
+jocky-parser = { path = "../jocky-parser" }
+jocky-ir = { path = "../jocky-ir" }
+jocky-crypto = { path = "../jocky-crypto" }
+jocky-agent = { path = "../jocky-agent" }
+jocky-compiler = { path = "../jocky-compiler" }
+jocky-lab = { path = "../jocky-lab" }
+serde_json = { workspace = true }

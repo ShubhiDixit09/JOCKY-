@@ -1,0 +1,8 @@
+case "TEST-CAP-VIOLATION" description "Driver query without driver.read capability";
+
+capabilities {
+    grant process.read;
+    // Missing grant driver.read;
+}
+
+query drivers = host.drivers();
