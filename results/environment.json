@@ -1,0 +1,8 @@
+{
+  "arch": "x86_64",
+  "jocky_version": "0.1.0-research",
+  "os": "windows",
+  "rust_toolchain": "rustc 1.90.0 (stable)",
+  "timestamp_utc": "2026-08-29T18:21:53.841861100+00:00",
+  "total_scenarios_evaluated": 11
+}

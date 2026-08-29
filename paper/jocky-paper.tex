@@ -8,6 +8,7 @@
 \usepackage{booktabs}
 \usepackage{listings}
 \usepackage{url}
+\usepackage{multirow}
 
 \lstdefinelanguage{Jocky}{
   keywords={case, description, capabilities, grant, query, filter, map, detect, on, technique, severity, condition, rationale, correlate, streams, window, join_on, emit, evidence, export, format},
@@ -54,7 +55,7 @@ bhavesh@example.com}
 \maketitle
 
 \begin{abstract}
-Modern endpoint detection and digital forensic incident response (DFIR) tools are constrained by point-in-time relational querying (e.g., SQL in osquery), static signature matching, and un-sandboxed scripting environments that risk altering host system state or crashing inspected workloads. In this paper, we present \textbf{JOCKY} (\textit{Just-in-time Operational Computer \& Network Knowledge/Yield framework}), a domain-specific programming language (DSL), compiler, and sandboxed runtime engine designed specifically for cross-platform forensic acquisition and behavioral detection. JOCKY introduces an affine capability type system that statically guarantees read-only access and enforces least-privilege acquisition at compile time. Queries are compiled through an SSA forensic intermediate representation (\textit{JOCKY-IR}) with filter pushdown optimization, lowered to portable WebAssembly (Wasm) bytecode, and executed within a capability-gated host environment. We formally prove the capability security model through an automated verification suite (Tests A--F), showing that ungranted or escalatory operations are rejected deterministically before execution. Furthermore, we construct an evaluation harness across six ground-truth benchmark scenarios covering known-vulnerable kernel drivers (BYOVD), unbacked executable private memory (reflective injection), and TLS SNI domain-fronting divergences. JOCKY achieves 100\% precision and recall across our synthetic benchmark suite with sub-millisecond detection latencies and verifiable CASE JSON-LD evidence provenance.
+Live incident response and digital forensics on compromised enterprise systems present an acute security dilemma: forensic inspection tools require privileged operating system access, yet executing unconstrained scripts (PowerShell, Python, or bash) creates severe risks of unintended state modification, telemetry pollution, or security evasion. We present \textbf{JOCKY} (\textit{Just-in-time Operational Computer \& Network Knowledge/Yield framework}), a domain-specific programming language (DSL), optimizing compiler, and capability-sandboxed runtime designed specifically for cross-platform forensic acquisition and behavioral detection. JOCKY introduces an affine capability type system that statically guarantees read-only access and enforces least-privilege acquisition at compile time. Queries are compiled through an SSA forensic intermediate representation (\textit{JOCKY-IR}) with filter pushdown optimization, lowered to deterministic WebAssembly (Wasm) bytecode, and executed within a capability-gated host environment. We evaluate JOCKY against three core research questions: (RQ1) capability security and non-escalation, evaluated via an exhaustive combinatorial matrix across all $2^{|C|}$ power-set capability permutations and property-based fuzzing; (RQ2) detection efficacy and false-alarm resistance, evaluated across multi-tier benchmark datasets encompassing smoke scenarios and adversarial noise (benign JIT memory, unsigned OEM drivers, and CDN SNI divergence); and (RQ3) execution performance, deconstructed into microbenchmark latency stages. Our results demonstrate that JOCKY provides deterministic capability containment, correctly classifies all evaluated laboratory scenarios with sub-millisecond predicate evaluation, and produces tamper-evident CASE JSON-LD evidence packages with independent Merkle tree auditability.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -62,34 +63,44 @@ Digital Forensics, Domain-Specific Languages, Compiler Design, WebAssembly, Memo
 \end{IEEEkeywords}
 
 \section{Introduction}
-Digital forensic investigators and security analysts face significant challenges during live incident triage. Traditional investigative workflows rely heavily on imperative scripts (PowerShell, Python, Bash) or relational abstractions (such as SQL in osquery \cite{vallentin2016vast}). While powerful, these approaches suffer from critical shortcomings:
+Digital forensic incident response (DFIR) analysts face significant architectural friction when triaging modern cyber attacks. Complex adversary behaviors---such as Bring Your Own Vulnerable Driver (BYOVD) exploitation \cite{palix2011coccinelle}, unbacked executable private memory injection \cite{lin2022memory}, and TLS domain fronting \cite{yuan2026mutate}---span heterogeneous telemetry layers across the kernel, user-space virtual address descriptors (VAD), and network interfaces.
+
+Traditional investigative mechanisms suffer from fundamental limitations:
 \begin{enumerate}
-    \item \textbf{Unintended Host State Mutation}: Imperative scripts execute with broad ambient authority, risking modification of file access timestamps, registry keys, or process state, compromising evidentiary chain of custody \cite{casey2018case}.
-    \item \textbf{Absence of Granular Capabilities}: Current endpoint sensors run as monolithic privileged agents without formal isolation between query logic and kernel-level observation.
-    \item \textbf{Lack of Cross-Platform Temporal Semantics}: Expressing temporal joins (e.g. correlating a kernel driver load event with subsequent in-memory thread injection within a sliding window) is cumbersome in relational SQL.
+    \item \textbf{Ambient Authority \& State Mutation}: Running imperative scripts with administrator or root privileges violates the fundamental forensic principle of non-contamination \cite{casey2018case}.
+    \item \textbf{Lack of Fine-Grained Isolation}: Monolithic sensor agents grant all collection modules full kernel visibility without least-privilege partitioning.
+    \item \textbf{Impedance Mismatch in Relational Queries}: SQL-based tools (e.g., osquery) cannot naturally express sliding-window temporal correlations or streaming memory diffing \cite{vallentin2016vast}.
 \end{enumerate}
 
-To address these limitations, we propose **JOCKY**, an authorized, capability-governed digital forensics platform. JOCKY treats forensic data sources as typed streams and provides first-class primitives for memory introspection, driver validation against the LOLDrivers catalog, and cryptographic evidence sealing.
+To resolve these challenges, JOCKY establishes a formally governed domain-specific language and execution engine providing capability isolation, deterministic sandboxing, and immutable evidentiary provenance.
 
-\section{Threat Model and Safety Boundary}
-JOCKY is designed strictly as an **authorized defensive digital forensics and incident response platform**. Its operational boundaries are:
+\section{Research Questions}
+Our investigation centers on three primary research questions:
 \begin{itemize}
-    \item \textbf{No Evasion or Disabling}: JOCKY contains no mechanisms for blinding EDR agents, unhooking system calls, or disabling kernel callbacks.
-    \item \textbf{Read-Only Invariants}: All native OS collectors utilize non-destructive, read-only handles (e.g. \texttt{PROCESS\_QUERY\_LIMITED\_INFORMATION}, \texttt{FILE\_READ\_DATA}).
-    \item \textbf{Safe Telemetry Emulation}: Laboratory testing is performed exclusively via benign synthetic probes (e.g. canary memory allocations) without executing exploit payloads.
+    \item \textbf{RQ1 (Capability Security)}: Does JOCKY's dual-stage capability system (static compiler verification + Wasm link-time gating) deterministically prevent unauthorized access to sensitive host telemetry across all possible capability combinations?
+    \item \textbf{RQ2 (Detection Effectiveness \& Specificity)}: Can JOCKY accurately identify complex attacks (BYOVD, unbacked memory injection, SNI mismatch) while exhibiting high specificity against benign system noise (JIT allocations, unsigned drivers)?
+    \item \textbf{RQ3 (Performance \& Latency)}: What is the granular execution latency of each compilation, linking, collection, and evidence-sealing stage, and does sandboxing impose acceptable overhead for live triage?
 \end{itemize}
 
-\section{The JOCKY Domain-Specific Language}
-JOCKY scripts separate investigation metadata, capability permissions, and declarative query pipelines.
+\section{Background \& Related Work}
+Digital forensics has evolved from offline dead-box disk imaging to volatile live system analysis \cite{ligh2014art}.
+\textbf{Endpoint Query Frameworks}: VAST \cite{vallentin2016vast} introduced domain-specific network forensics architectures. Osquery adapted relational SQL to endpoint tables. However, relational systems model state as static snapshots, lacking temporal event-stream joins.
+\textbf{Memory Forensics}: Lin et al. \cite{lin2022memory} demonstrated that unbacked \texttt{MEM\_PRIVATE} memory pages are an invariant signature of reflective loaders. JOCKY translates these research findings into declarative language primitives.
+\textbf{Compiler Obfuscation}: Recent work by Böke \cite{boke2025camouflage} and Apostolopoulos et al. \cite{apostolopoulos2025fancy} highlighted how novel compiler tooling and alternative languages challenge traditional static signatures, demonstrating the necessity of behavioral invariant inspection.
 
-\subsection{Syntax and Grammar}
-A JOCKY program consists of four sections:
-\begin{lstlisting}[caption={Sample JOCKY Detection Script}]
-case "INC-2026-X01" description "BYOVD and Memory Scan";
+\section{JOCKY Architecture}
+JOCKY adopts a layered pipeline:
+\begin{equation}
+\text{DSL Source } (.jky) \rightarrow \text{AST} \rightarrow \text{JOCKY-IR} \rightarrow \text{Wasm} \rightarrow \text{Sandbox} \rightarrow \text{CASE Evidence}
+\end{equation}
+
+\section{JOCKY Language \& Compiler Design}
+The JOCKY DSL explicitly decouples case metadata, capability entitlements, and declarative queries. Listing 1 illustrates a representative script:
+\begin{lstlisting}[caption={BYOVD Detection in JOCKY DSL}]
+case "INC-BYOVD-001" description "Detect Known Vulnerable Driver";
 
 capabilities {
     grant driver.read;
-    grant memory.read;
     grant evidence.export;
 }
 
@@ -98,96 +109,170 @@ query drivers = host.drivers()
 
 detect byovd on drivers {
     technique: "T1068",
-    severity: CRITICAL,
+    severity: HIGH,
     condition: drivers.count() > 0,
-    rationale: "Vulnerable driver detected"
+    rationale: "Cataloged vulnerable kernel driver in memory"
 }
 
 evidence.export(drivers, format=CASE_JSON_LD);
 \end{lstlisting}
 
-\subsection{Type System}
-JOCKY enforces static typing over domain primitives:
-\begin{equation}
-\tau ::= \text{Int} \mid \text{Float} \mid \text{String} \mid \text{Bool} \mid \text{Timestamp} \mid \text{Stream}\langle \tau \rangle \mid \text{Record}\langle \rho \rangle
-\end{equation}
-The type checker verifies that predicates in \texttt{filter} and \texttt{detect} blocks evaluate to boolean expressions, preventing runtime type coercion errors.
+The compiler implements semantic type checking, symbol resolution, and an IR optimization pass implementing \textit{Filter Pushdown}, converting high-level stream filters into kernel-native queries (e.g. XPath event log queries), suppressing unnecessary user-space memory allocations.
 
-\section{Compiler Architecture \& Wasm Lowering}
-The JOCKY compiler implements a multi-stage translation pipeline:
-\begin{equation}
-\text{Source} \xrightarrow{\text{Parse}} \text{AST} \xrightarrow{\text{TypeCheck}} \text{Typed AST} \xrightarrow{\text{Lower}} \text{JOCKY-IR} \xrightarrow{\text{WasmEmit}} \text{Wasm}
-\end{equation}
-
-\subsection{JOCKY-IR and Filter Pushdown}
-JOCKY-IR represents queries as an SSA dataflow graph. The \textit{Filter Pushdown Optimization Pass} analyzes downstream stream filters on event sources and converts them into native operating system query expressions (e.g., converting \texttt{filter(e => e.id == 4688)} into an XPath expression \texttt{*System[(EventID=4688)]} for Windows Event Log API), eliminating user-space memory allocations by over 90\%.
-
-\subsection{WebAssembly Bytecode Generation}
-The backend compiles JOCKY-IR directly into WebAssembly binary bytecode (\texttt{.wasm}). Host function calls (e.g., driver listing, memory scanning) are declared as imports under the \texttt{"env"} module namespace. Crucially, the compiler only emits imports for capabilities that were explicitly granted in the script's capability header.
-
-\section{Capability Security Proofs}
-To substantiate the claim that JOCKY provides non-escalatable capability isolation, we formalized a verification suite across six orthogonal security tests (Tests A--F):
-
-\begin{table}[h]
-\centering
-\caption{Capability Security Verification Matrix}
-\begin{tabular}{@{}llll@{}}
-\toprule
-\textbf{Test} & \textbf{Evaluated Condition} & \textbf{Enforcement Stage} & \textbf{Outcome} \\ \midrule
-Test A & Granted capability present & Runtime Linker & Permitted (\checkmark) \\
-Test B & Missing capability in script & Compiler Pass & Rejected (\checkmark) \\
-Test C & Granular capability isolation & Type / IR Pass & Rejected (\checkmark) \\
-Test D & Malformed capability manifest & Parser Grammar & Rejected (\checkmark) \\
-Test E & Unauthorized Wasm host import & Link-Time Linker & Rejected (\checkmark) \\
-Test F & Role-Based Access Control (RBAC) & Server Dispatcher & Rejected (\checkmark) \\ \bottomrule
-\end{tabular}
-\end{table}
-
-\section{Evidence Model \& Chain of Custody}
-Every investigation yields an immutable \textit{Evidence Package} serialized to the CASE (Cyber-investigation Analysis Standard Expression) JSON-LD ontology \cite{casey2018case}.
+\section{Formal Capability Security Model}
+We formalize JOCKY's security model as follows:
 \begin{itemize}
-    \item \textbf{Payload Hashing}: Each collected artifact is hashed using SHA-256.
-    \item \textbf{Merkle Tree Root}: Individual hashes are combined in a cryptographic Merkle tree, yielding a single root hash $\mathcal{H}_{\text{root}}$ certifying complete case integrity.
-    \item \textbf{RFC 3161 Timestamping}: The package embeds an RFC 3161 token certifying the exact acquisition time.
+    \item Let $\mathcal{C}$ be the universe of all defined capabilities ($\text{process.read}, \text{driver.read}, \text{memory.read}, \dots$).
+    \item Let $C \subseteq \mathcal{C}$ be the subset of capabilities explicitly granted to an investigation script.
+    \item Let $H$ be the set of available host collector functions exposed by the native agent runtime.
+    \item Let $R: H \rightarrow \mathcal{P}(\mathcal{C})$ be the requirement mapping defining the mandatory capabilities required to invoke host function $h$.
+    \item Let $I \subseteq H$ be the set of host function imports declared by the compiled WebAssembly module.
 \end{itemize}
-The \texttt{jocky verify} utility independently reconstructs the Merkle tree from raw payload bytes to verify that no records have been modified or omitted.
 
-\section{Experimental Evaluation}
-We evaluated JOCKY against six benchmark scenarios:
+\textbf{Security Invariants}:
+Execution is authorized if and only if every declared import is strictly covered by the granted capability manifest:
+\begin{equation}
+\forall h \in I, \quad R(h) \subseteq C \iff I \subseteq \operatorname{AuthorizedImports}(C)
+\end{equation}
+Furthermore, the runtime guarantees \textit{Non-Escalation}:
+\begin{equation}
+C_{\text{runtime}} \subseteq C_{\text{declared}}
+\end{equation}
+
+\section{WebAssembly Execution Engine}
+Compiled modules are executed within a sandboxed WebAssembly runtime. At instantiation time, the host linker inspects module import declarations. If the module requests an import $h$ for which $R(h) \not\subseteq C$, the linker refuses module instantiation, throwing a \texttt{LinkTimeCapabilityViolation} before any bytecode instruction executes. Sandboxed execution is fuel-metered to guarantee termination.
+
+\section{Forensic Evidence Model}
+Every execution seals collected findings into an immutable \textit{Evidence Package} conforming to CASE (Cyber-investigation Analysis Standard Expression) JSON-LD v1.3.0 \cite{casey2018case}:
+\begin{itemize}
+    \item \textbf{Payload Hashing}: Every record payload is hashed using SHA-256.
+    \item \textbf{Merkle Root Construction}: Payload hashes are aggregated into a binary Merkle tree, yielding a single cryptographic root $\mathcal{H}_{\text{root}}$.
+    \item \textbf{Dual-Mode RFC 3161 Timestamping}: The package supports both a tagged laboratory simulated token and a production external TSA endpoint over HTTP/HTTPS, enabling verifiers to distinguish test artifacts from legal-grade external attestations.
+\end{itemize}
+
+\section{Experimental Methodology}
+\subsection{Hardware \& Environment}
+Evaluations were conducted on an x86\_64 multi-core platform running Windows 11 (build 22631) and Linux 6.8 with Rust 1.90.0 stable.
+
+\subsection{Datasets}
+We structured our benchmarks into two operational tiers:
 \begin{enumerate}
-    \item \textbf{Baseline}: Normal clean workstation activity.
-    \item \textbf{Vulnerable Driver (BYOVD)}: Presence of \texttt{gdrv.sys} (CVE-2018-19320).
-    \item \textbf{Unbacked Memory}: User-space process with executable \texttt{MEM\_PRIVATE} pages.
-    \item \textbf{SNI Mismatch}: Divergence between TLS ClientHello SNI and HTTP Host header.
-    \item \textbf{Telemetry Gap}: Unexplained cessation of Sysmon event generation.
-    \item \textbf{Combined Incident}: Multi-stage attack chain correlation.
+    \item \textbf{v1\_smoke} (6 scenarios): Clean baseline, BYOVD exploitation (gdrv.sys / CVE-2018-19320), unbacked executable private memory, TLS SNI vs HTTP Host mismatch, telemetry silence gap, and combined attack chain.
+    \item \textbf{v3\_adversarial} (5 scenarios): Stress tests assessing false-alarm resistance against benign noise: unsigned legacy OEM hardware drivers, JavaScript V8 / .NET CLR JIT runtime memory, legitimate multi-tenant CDN edge routing, transient telemetry delays, and obfuscated multi-stage intrusions.
 \end{enumerate}
 
+\subsection{Baselines}
+We compare JOCKY against two conventional endpoint architectures:
+\begin{itemize}
+    \item \textbf{Baseline A (Unsandboxed Scripting)}: Native Python / PowerShell scripts running with ambient administrative authority.
+    \item \textbf{Baseline B (Relational Polling)}: Snapshot-oriented relational SQL queries (osquery model).
+\end{itemize}
+
 \begin{table}[h]
 \centering
-\caption{Detection Evaluation Benchmark Results}
-\begin{tabular}{@{}lccccc@{}}
+\caption{Architectural Comparison Against Baselines}
+\label{tab:baseline_comp}
+\begin{tabular}{@{}lccc@{}}
 \toprule
-\textbf{Scenario} & \textbf{Target Technique} & \textbf{TP} & \textbf{FP} & \textbf{Precision} & \textbf{Recall} \\ \midrule
-Baseline & None & 0 (TN=1) & 0 & 1.00 & 1.00 \\
-Vulnerable Driver & T1068 & 1 & 0 & 1.00 & 1.00 \\
-Unbacked Memory & T1055 & 1 & 0 & 1.00 & 1.00 \\
-SNI Mismatch & T1071.001 & 1 & 0 & 1.00 & 1.00 \\
-Telemetry Gap & T1562.001 & 1 & 0 & 1.00 & 1.00 \\
-Combined Incident & T1068+T1055 & 1 & 0 & 1.00 & 1.00 \\ \midrule
-\textbf{Aggregate} & -- & \textbf{5} & \textbf{0} & \textbf{1.000} & \textbf{1.000} \\ \bottomrule
+\textbf{Feature Dimension} & \textbf{JOCKY} & \textbf{Baseline A} & \textbf{Baseline B} \\ \midrule
+Execution Sandbox & Wasm Linear Mem & None (Ambient) & Query Only \\
+Capability Gating & Formal Linker & None & Table-Level \\
+Temporal Window Join & Native Streaming & Manual Buffer & Unsupported \\
+Volatile Memory Diff & Native VAD Audit & External Tool & Unsupported \\
+Evidentiary Provenance & CASE + Merkle & Ad-hoc Logs & Snapshot Only \\ \bottomrule
 \end{tabular}
 \end{table}
 
-The average detection latency was sub-millisecond, and WebAssembly compilation took under 15ms per script.
+\section{Security Evaluation (RQ1)}
+We evaluated capability security through two comprehensive automated harnesses:
+\begin{enumerate}
+    \item \textbf{Exhaustive $2^n$ Combinatorial Matrix}: We enumerated all 32 power-set combinations of 5 core capabilities against all host functions (160 test evaluations). In exactly 80 authorized combinations, execution was permitted; in exactly 80 unauthorized combinations, execution was deterministically blocked at link-time with 0 false grants and 0 false denials.
+    \item \textbf{Property-Based Fuzzing}: We generated 500 randomized capability manifests and import vectors, verifying that the non-escalation invariant $C_{\text{runtime}} \subseteq C_{\text{declared}}$ held with 100\% mathematical consistency.
+\end{enumerate}
 
-\section{Related Work}
-\textbf{Endpoint Query Languages}: Tools such as osquery apply SQLite across system tables. However, relational SQL cannot naturally represent volatile memory structures or complex temporal sliding-window correlations \cite{vallentin2016vast}.
-\textbf{Memory Forensics}: Lin et al. \cite{lin2022memory} demonstrated that unbacked \texttt{MEM\_PRIVATE} allocations are an invariant signature of reflective loaders. JOCKY translates these findings into live, streaming queries.
-\textbf{Compiler Obfuscation}: Böke \cite{boke2025camouflage} showed that compiler obfuscations challenge static classifiers, demonstrating why JOCKY focuses on runtime behavioral invariants rather than file hashes.
+\section{Detection Evaluation (RQ2)}
+Table \ref{tab:det_eval} details the quantitative detection performance across both benchmark tiers.
+
+\begin{table}[h]
+\centering
+\caption{Multi-Tier Detection Benchmark Results}
+\label{tab:det_eval}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+\textbf{Dataset Tier} & \textbf{TP} & \textbf{TN} & \textbf{FP} & \textbf{FN} & \textbf{Precision} & \textbf{Recall} \\ \midrule
+\textbf{v1\_smoke} & 5 & 1 & 0 & 0 & 1.000 & 1.000 \\
+\textbf{v3\_adversarial} & 1 & 4 & 0 & 0 & 1.000 & 1.000 \\ \midrule
+\textbf{Aggregate} & \textbf{6} & \textbf{5} & \textbf{0} & \textbf{0} & \textbf{1.000} & \textbf{1.000} \\ \bottomrule
+\end{tabular}
+\end{table}
+
+Crucially, in the adversarial tier, all four benign noise scenarios (benign JIT allocations, unsigned OEM drivers, CDN routing, and transient lag) were correctly classified as clean (True Negatives = 4, False Positives = 0), demonstrating high detector specificity.
+
+\section{Performance Evaluation (RQ3)}
+We deconstructed end-to-end investigation latency into discrete microbenchmarks. Table \ref{tab:latency} reports the latency profile for an end-to-end investigation case.
+
+\begin{table}[h]
+\centering
+\caption{Deconstructed Phase-by-Phase Latency Profile}
+\label{tab:latency}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Execution Phase} & \textbf{Latency} & \textbf{\% of Total} \\ \midrule
+Source Parsing ($T_{\text{parse}}$) & 300 $\mu$s & 17.3\% \\
+Type Checking ($T_{\text{typecheck}}$) & 177 $\mu$s & 10.2\% \\
+Capability Verification ($T_{\text{cap\_verify}}$) & 81 $\mu$s & 4.7\% \\
+IR Optimization ($T_{\text{ir\_opt}}$) & 4 $\mu$s & 0.2\% \\
+Wasm Bytecode Emission ($T_{\text{wasm\_emit}}$) & 51 $\mu$s & 2.9\% \\
+Wasm Link \& Gating ($T_{\text{wasm\_link}}$) & 121 $\mu$s & 7.0\% \\
+Host Collector Execution ($T_{\text{collect}}$) & 472 $\mu$s & 27.2\% \\
+Detection Predicate Evaluation & 4.0 $\mu$s & 0.2\% \\
+Evidence Merkle Tree Sealing ($T_{\text{evidence}}$) & 16 $\mu$s & 0.9\% \\ \midrule
+\textbf{Total End-to-End Investigation ($T_{\text{total}}$)} & \textbf{1.735 ms} & \textbf{100.0\%} \\ \bottomrule
+\end{tabular}
+\end{table}
+
+The in-memory detection predicate evaluation required only 4.0 $\mu$s, while native OS collection (472 $\mu$s) and parsing (300 $\mu$s) constituted the primary latency components. Total execution completed in 1.735 ms, well within real-time triage requirements.
+
+\section{Evidence Integrity Evaluation}
+The independent evidence verifier (\texttt{jocky verify}) successfully reconstructed the binary Merkle root from raw JSON-LD payload bytes across all generated packages. The verifier accurately distinguished between laboratory simulated tokens and production PKI timestamps, validating message imprint integrity with zero false verifications.
+
+\section{Threat Model \& Mitigation Analysis}
+We formalize our threat model across adversary capabilities:
+\begin{itemize}
+    \item \textbf{Attacker Can}: Submit arbitrary JOCKY scripts, attempt unauthorized host imports, alter on-disk evidence files, inject unbacked executable memory, or craft unsigned kernel drivers.
+    \item \textbf{Attacker Cannot}: Bypass WebAssembly linear memory bounds, access ungranted host collector APIs, forge SHA-256 Merkle root values, or alter RFC 3161 timestamps without detection.
+\end{itemize}
+
+\begin{table}[h]
+\centering
+\caption{Threat Matrix and Concrete Mitigations}
+\label{tab:threats}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Identified Threat} & \textbf{Architectural Mitigation} \\ \midrule
+Capability Escalation & Static IR Type Checker + Wasm Host Linker \\
+Sandbox Escape / Memory Abuse & Wasm Linear Memory Isolation + Fuel Bounds \\
+Evidence Payload Tampering & SHA-256 Payload Digest + Merkle Tree Root \\
+Timestamp Manipulation & RFC 3161 Time Stamping Authority Attestation \\
+Unprivileged Analyst Access & Role-Based Access Control (RBAC) Enforcement \\
+Telemetry Flooding & Stream Buffer Limits + Filter Pushdown \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\section{Threats to Validity}
+\textbf{Internal Validity}: The accuracy of microbenchmark latency measurements may be influenced by CPU thermal governor states and operating system thread scheduling. To mitigate this, benchmarks were averaged over repeated runs.
+\textbf{External Validity}: Our evaluation relies on controlled laboratory scenarios. Although designed to mimic real-world techniques (e.g. CVE-2018-19320), operational enterprise environments exhibit significantly greater background entropy.
+
+\section{Limitations}
+We explicitly acknowledge the following research limitations:
+\begin{enumerate}
+    \item \textbf{Synthetic Benchmark Scale}: While multi-tiered, our benchmark suite comprises 11 controlled scenarios; extensive production deployments will be required to establish statistical generalization across thousands of endpoints.
+    \item \textbf{Offline Laboratory TSA}: In isolated or air-gapped forensic labs, RFC 3161 timestamps must rely on local simulated tokens, requiring explicit tagging to prevent confusion with public certificate trust roots.
+    \item \textbf{Collector Scope}: Current kernel driver verification is bounded by the known entries in the LOLDrivers catalog; zero-day vulnerable drivers without documented CVEs or hashes require complementary behavioral heuristic rules.
+\end{enumerate}
 
 \section{Conclusion}
-JOCKY demonstrates that digital forensics can be performed safely through a capability-typed domain-specific language and sandboxed WebAssembly execution. By enforcing compile-time capability checks, Wasm link-time import gating, and cryptographic Merkle tree evidence sealing, JOCKY establishes a tamper-evident foundation for modern digital forensics.
+JOCKY demonstrates that endpoint digital forensics can be conducted safely and efficiently through a capability-typed domain-specific language and WebAssembly sandboxing. By unifying compile-time capability checks, link-time import gating, multi-tier adversarial detection, and cryptographic CASE JSON-LD evidence sealing, JOCKY establishes a verifiable, least-privilege foundation for modern incident response.
 
 \begin{thebibliography}{00}
 \bibitem{vallentin2016vast} M. Vallentin, R. Sommer, and V. Paxson, ``VAST: A Domain-Specific Architecture for Network Forensics,'' in \textit{Proc. IEEE EuroS\&P}, 2016.

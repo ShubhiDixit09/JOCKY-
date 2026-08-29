@@ -1,4 +1,5 @@
 {
+  "tier": "v1_smoke",
   "scenario": "baseline",
   "description": "Standard benign workstation activity with WHQL signed drivers and image-backed memory",
   "expected_detection": false,

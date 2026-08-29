@@ -1,0 +1,2 @@
+t_parse_us,t_typecheck_us,t_cap_verify_us,t_ir_opt_us,t_wasm_emit_us,t_wasm_link_us,t_collect_us,t_predicate_ns,t_evidence_us,t_total_ms
+400,140,54,4,43,62,386,3500,9,1.698

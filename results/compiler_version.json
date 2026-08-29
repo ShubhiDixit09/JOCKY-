@@ -1,0 +1,8 @@
+{
+  "jocky_version": "0.1.0-research",
+  "rustc_version": "rustc 1.90.0 (stable)",
+  "cargo_edition": "2021",
+  "llvm_version": "19.1.0",
+  "wasm_target": "wasm32-unknown-unknown (Deterministic Pure-Rust Bytecode)",
+  "release_tag": "v0.1.0-research"
+}

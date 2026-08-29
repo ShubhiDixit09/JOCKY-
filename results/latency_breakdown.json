@@ -1,0 +1,13 @@
+{
+  "t_parse_us": 400,
+  "t_typecheck_us": 140,
+  "t_cap_verify_us": 54,
+  "t_ir_lower_us": 0,
+  "t_ir_opt_us": 4,
+  "t_wasm_emit_us": 43,
+  "t_wasm_link_us": 62,
+  "t_host_collect_us": 386,
+  "t_predicate_eval_ns": 3500,
+  "t_evidence_seal_us": 9,
+  "t_total_ms": 1.6981
+}

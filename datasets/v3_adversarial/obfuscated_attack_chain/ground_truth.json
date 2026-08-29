@@ -1,0 +1,8 @@
+{
+  "tier": "v3_adversarial",
+  "scenario": "obfuscated_attack_chain",
+  "description": "Multi-vector attack with delayed persistence execution, stealth driver load, and reflective payload under high event noise",
+  "expected_detection": true,
+  "expected_technique": "T1068+T1055",
+  "ground_truth": "adversarial_malicious_chain"
+}

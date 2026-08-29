@@ -1,0 +1,4 @@
+Architecture,ExecutionSandbox,CapabilityEnforcement,TemporalWindowJoin,LiveMemoryDiffing,TamperEvidentProvenance
+JOCKY (Wasm + Rust),Wasm Linear Memory,Formal Affine Host Linker,Native Streaming Sliding Window,Native Relocation Verification,CASE JSON-LD + Merkle + RFC 3161
+Baseline A (Native Script),None (Ambient Authority),None (Ad-hoc API),Manual in-memory buffer,External tool invocation,None (Ad-hoc text logs)
+Baseline B (Relational SQL),Query Sandbox Only,Table-Level Read Only,Lacks Sliding Temporal Window,Lacks Byte-Level VAD Diff,Relational Snapshot Only

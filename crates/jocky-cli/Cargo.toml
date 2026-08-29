@@ -19,6 +19,7 @@ jocky-lab = { path = "../jocky-lab" }
 jocky-compiler = { path = "../jocky-compiler" }
 clap = { workspace = true }
 colored = { workspace = true }
+chrono = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

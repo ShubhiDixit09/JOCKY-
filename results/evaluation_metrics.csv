@@ -1,2 +1,2 @@
-tp,tn,fp,fn,precision,recall,f1,avg_latency_us
-5,1,0,0,1.0000,1.0000,1.0000,0
+tp,tn,fp,fn,precision,recall,f1
+6,5,0,0,1.0000,1.0000,1.0000

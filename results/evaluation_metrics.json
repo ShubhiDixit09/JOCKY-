@@ -1,10 +1,10 @@
 {
-  "avg_detection_latency_us": 0,
+  "evaluation_claim": "JOCKY correctly classified all tested smoke and adversarial laboratory scenarios without false positives on benign noise.",
   "f1_score": 1.0,
   "fn": 0,
   "fp": 0,
   "precision": 1.0,
   "recall": 1.0,
-  "tn": 1,
-  "tp": 5
+  "tn": 5,
+  "tp": 6
 }

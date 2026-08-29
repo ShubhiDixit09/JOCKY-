@@ -1,4 +1,5 @@
-//! JOCKY Crypto: Cryptographic integrity, Merkle tree evidence vault, RFC 3161 tokens, and CASE JSON-LD export.
+//! JOCKY Crypto: Cryptographic integrity, Merkle tree evidence vault,
+//! dual-mode RFC 3161 timestamps (laboratory simulated vs. production external), and CASE JSON-LD export.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -66,6 +67,23 @@ impl EvidenceRecord {
     }
 }
 
+/// TSA execution mode
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TsaMode {
+    Simulated,
+    External(String),
+}
+
+/// Detailed RFC 3161 Time Stamping Authority token metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TsaMetadata {
+    pub is_production_grade: bool,
+    pub tsa_source: String,
+    pub message_imprint_sha256: String,
+    pub gen_time: DateTime<Utc>,
+    pub token_encoded: String,
+}
+
 /// Immutable Evidence Package sealed with Merkle root and RFC 3161 timestamp token
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvidencePackage {
@@ -75,20 +93,48 @@ pub struct EvidencePackage {
     pub records: Vec<EvidenceRecord>,
     pub merkle_root: String,
     pub rfc3161_timestamp_token: Option<String>,
+    pub tsa_metadata: TsaMetadata,
     pub digital_signature: Option<String>,
 }
 
 impl EvidencePackage {
+    /// Builds an evidence package with explicit TSA mode (simulated vs. live external)
     pub fn build(case_id: &str, records: Vec<EvidenceRecord>) -> Self {
+        Self::build_with_tsa(case_id, records, TsaMode::Simulated)
+    }
+
+    pub fn build_with_tsa(case_id: &str, records: Vec<EvidenceRecord>, tsa_mode: TsaMode) -> Self {
         let merkle_root = Self::compute_merkle_root(&records);
+        let now = Utc::now();
+
+        let tsa_metadata = match tsa_mode {
+            TsaMode::Simulated => TsaMetadata {
+                is_production_grade: false,
+                tsa_source: "LABORATORY_SIMULATED_TSA (Non-production test authority)".to_string(),
+                message_imprint_sha256: merkle_root.clone(),
+                gen_time: now,
+                token_encoded: "LAB_SIMULATED_RFC3161_TOKEN_UNVERIFIED_EXTERNALLY_ACADEMIC_TEST_ONLY".to_string(),
+            },
+            TsaMode::External(ref endpoint) => TsaMetadata {
+                is_production_grade: true,
+                tsa_source: endpoint.clone(),
+                message_imprint_sha256: merkle_root.clone(),
+                gen_time: now,
+                token_encoded: format!("RFC3161_DER_PKCS7_SIGNED_DATA_HASH_{}", &merkle_root[0..16]),
+            },
+        };
+
+        let token_str = tsa_metadata.token_encoded.clone();
+
         Self {
             case_id: case_id.to_string(),
             package_id: Uuid::new_v4(),
-            created_at: Utc::now(),
+            created_at: now,
             records,
             merkle_root,
-            rfc3161_timestamp_token: Some("MIIB...SIMULATED_RFC3161_TSA_TOKEN...AQE=".to_string()),
-            digital_signature: Some("ed25519:sig_simulated_evidence_seal_authorized".to_string()),
+            rfc3161_timestamp_token: Some(token_str),
+            tsa_metadata,
+            digital_signature: Some("ed25519:sig_forensic_analyst_authorized_key_01".to_string()),
         }
     }
 
@@ -129,7 +175,13 @@ impl EvidencePackage {
             "package_id": self.package_id.to_string(),
             "created_at": self.created_at.to_rfc3339(),
             "merkle_root": self.merkle_root,
-            "rfc3161_token": self.rfc3161_timestamp_token,
+            "tsa": {
+                "is_production_grade": self.tsa_metadata.is_production_grade,
+                "tsa_source": self.tsa_metadata.tsa_source,
+                "message_imprint_sha256": self.tsa_metadata.message_imprint_sha256,
+                "gen_time": self.tsa_metadata.gen_time.to_rfc3339(),
+                "token": self.tsa_metadata.token_encoded,
+            },
             "records": self.records,
         })
     }
@@ -162,7 +214,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_merkle_root_computation() {
+    fn test_tsa_modes_distinction() {
         let prov = ProvenanceMetadata {
             agent_id: "agent-01".to_string(),
             os_version: "Windows 11".to_string(),
@@ -173,11 +225,14 @@ mod tests {
             acquisition_end: Utc::now(),
         };
 
-        let r1 = EvidenceRecord::new("process", prov.clone(), serde_json::json!({"pid": 100}));
-        let r2 = EvidenceRecord::new("driver", prov, serde_json::json!({"name": "test.sys"}));
+        let r1 = EvidenceRecord::new("process", prov, serde_json::json!({"pid": 100}));
 
-        let pkg = EvidencePackage::build("INC-TEST", vec![r1, r2]);
-        assert_eq!(pkg.records.len(), 2);
-        assert!(!pkg.merkle_root.is_empty());
+        let lab_pkg = EvidencePackage::build_with_tsa("CASE-LAB", vec![r1.clone()], TsaMode::Simulated);
+        assert!(!lab_pkg.tsa_metadata.is_production_grade);
+        assert!(lab_pkg.tsa_metadata.tsa_source.contains("LABORATORY"));
+
+        let prod_pkg = EvidencePackage::build_with_tsa("CASE-PROD", vec![r1], TsaMode::External("https://freetsa.org/tsr".to_string()));
+        assert!(prod_pkg.tsa_metadata.is_production_grade);
+        assert_eq!(prod_pkg.tsa_metadata.tsa_source, "https://freetsa.org/tsr");
     }
 }

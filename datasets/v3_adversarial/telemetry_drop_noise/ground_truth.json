@@ -1,0 +1,8 @@
+{
+  "tier": "v3_adversarial",
+  "scenario": "telemetry_drop_noise",
+  "description": "Transient queue congestion causing short 5-second event log lag while Sysmon service is verified actively running",
+  "expected_detection": false,
+  "expected_technique": "NONE",
+  "ground_truth": "adversarial_benign_lag"
+}
