@@ -1,0 +1,41 @@
+case "INC-CORR-003" description "Correlated multi-vector host and network anomaly investigation";
+
+capabilities {
+    grant process.read;
+    grant memory.read;
+    grant driver.read;
+    grant network.read;
+    grant evidence.export;
+}
+
+import std.forensics.windows as win;
+import std.detect.injection as inj;
+import std.detect.byovd as byovd;
+
+// Stream 1: Suspicious vulnerable drivers
+query suspicious_drivers = host.drivers()
+    | filter(d => d.is_known_vulnerable == true);
+
+// Stream 2: Injected unbacked executable memory
+query unbacked_processes = host.processes()
+    | filter(p => p.name !in ["System", "smss.exe"])
+    | map(p => {
+        target_process: p,
+        private_rwx: memory.scan_regions(pid: p.pid)
+    })
+    | filter(r => r.private_rwx.count() > 0);
+
+// Temporal correlation: Combine driver loading and in-memory injection within 1 hour
+correlate multi_stage_intrusion {
+    streams: [suspicious_drivers, unbacked_processes],
+    window: 1h,
+    join_on: suspicious_drivers.host_id == unbacked_processes.host_id,
+    emit: {
+        host: host.info(),
+        driver_evidence: suspicious_drivers,
+        memory_evidence: unbacked_processes,
+        sealed_at: timestamp.now()
+    }
+}
+
+evidence.export(multi_stage_intrusion, format=CASE_JSON_LD, destination="evidence://central/cases/INC-CORR-003");

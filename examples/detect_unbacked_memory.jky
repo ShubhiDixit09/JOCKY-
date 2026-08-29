@@ -1,0 +1,32 @@
+case "INC-MEM-002" description "Detection of unbacked executable private memory in user processes";
+
+capabilities {
+    grant process.read;
+    grant memory.read;
+    grant evidence.export;
+}
+
+import std.forensics.windows as win;
+import std.detect.injection as inj;
+
+// Query active processes and scan memory descriptors for unbacked RWX / RX regions
+query unbacked_injections = host.processes()
+    | filter(p => p.name !in ["System", "smss.exe"])
+    | map(p => {
+        process: p,
+        rwx_pages: memory.scan_regions(
+            pid: p.pid,
+            protect_in: ["PAGE_EXECUTE_READWRITE", "PAGE_EXECUTE_READ"],
+            type_in: ["MEM_PRIVATE"]
+        )
+    })
+    | filter(res => res.rwx_pages.count() > 0);
+
+detect process_injection on unbacked_injections {
+    technique: "T1055 - Process Injection: Unbacked Executable Memory",
+    severity: HIGH,
+    condition: unbacked_injections.count() > 0,
+    rationale: "Detected executable memory regions in user space lacking on-disk image file backing"
+}
+
+evidence.export(unbacked_injections, format=STIX, destination="evidence://vault/injections");

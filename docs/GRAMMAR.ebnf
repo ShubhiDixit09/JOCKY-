@@ -1,0 +1,108 @@
+(* ========================================================================= *)
+(* JOCKY Grammar Specification (v1.0.0)                                     *)
+(* Just-in-time Operational Computer & Network Knowledge/Yield framework   *)
+(* ========================================================================= *)
+
+Program             ::= CaseHeader CapabilityBlock ImportList StatementList ;
+
+CaseHeader          ::= "case" StringLiteral [ "description" StringLiteral ] ";" ;
+
+CapabilityBlock     ::= "capabilities" "{" { CapabilityDecl } "}" ;
+CapabilityDecl      ::= "grant" CapabilityName ";" ;
+CapabilityName      ::= Ident ( "." Ident )* ;
+
+ImportList          ::= { "import" ModulePath [ "as" Ident ] ";" } ;
+ModulePath          ::= Ident ( "." Ident )* ;
+
+StatementList       ::= { Statement } ;
+Statement           ::= LetBinding
+                      | QueryStatement
+                      | DetectStatement
+                      | CorrelateStatement
+                      | ExportStatement
+                      | ConditionalStatement ;
+
+LetBinding          ::= "let" Ident [ ":" TypeAnnotation ] "=" Expression ";" ;
+
+TypeAnnotation      ::= "Int" | "Float" | "String" | "Bool" | "Timestamp" | "Duration" | "Hash"
+                      | "Process" | "Module" | "Socket" | "EventRecord" | "FileRecord"
+                      | "MemoryRegion" | "DriverRecord" | "EvidencePackage"
+                      | "List" "<" TypeAnnotation ">"
+                      | "Stream" "<" TypeAnnotation ">"
+                      | "Map" "<" TypeAnnotation "," TypeAnnotation ">" ;
+
+QueryStatement      ::= "query" Ident "=" SourceExpr { PipeStage } ";" ;
+
+SourceExpr          ::= "host" "." Ident "(" [ ArgList ] ")"
+                      | "process" "." Ident "(" [ ArgList ] ")"
+                      | "filesystem" "." Ident "(" [ ArgList ] ")"
+                      | "memory" "." Ident "(" [ ArgList ] ")"
+                      | "eventlog" "." Ident "(" [ ArgList ] ")"
+                      | "network" "." Ident "(" [ ArgList ] ")"
+                      | "registry" "." Ident "(" [ ArgList ] ")"
+                      | "lab" "." Ident "(" [ ArgList ] ")" ;
+
+PipeStage           ::= "|" PipeOp "(" [ ArgList ] ")" ;
+PipeOp              ::= "filter" | "map" | "where" | "sort" | "window" | "join" | "dedup" | "limit" | "take" ;
+
+DetectStatement     ::= "detect" Ident "on" Expression "{"
+                          "technique" ":" StringLiteral ","
+                          "severity"  ":" SeverityLevel ","
+                          "condition" ":" Expression ","
+                          "rationale" ":" StringLiteral
+                        "}" ;
+
+SeverityLevel       ::= "INFORMATIONAL" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" ;
+
+CorrelateStatement  ::= "correlate" Ident "{"
+                          "streams" ":" "[" ExprList "]" ","
+                          "window"  ":" DurationLiteral ","
+                          "join_on" ":" BinaryExpr ","
+                          "emit"    ":" Expression
+                        "}" ;
+
+ExportStatement     ::= "evidence" "." "export" "(" Expression "," "format" "=" ExportFormat [ "," "destination" "=" StringLiteral ] ")" ";" ;
+ExportFormat        ::= "STIX" | "CASE_JSON_LD" | "RAW_PARQUET" | "CSV" ;
+
+ConditionalStatement::= "if" Expression "{" StatementList "}" [ "else" "{" StatementList "}" ] ;
+
+Expression          ::= LambdaExpr | LogicalOrExpr ;
+LambdaExpr          ::= Ident "=>" Expression ;
+
+LogicalOrExpr       ::= LogicalAndExpr { "or" LogicalAndExpr } ;
+LogicalAndExpr      ::= EqualityExpr { "and" EqualityExpr } ;
+EqualityExpr        ::= RelationalExpr { ( "==" | "!=" | "=~" | "!~" ) RelationalExpr } ;
+RelationalExpr      ::= AdditiveExpr { ( "<" | "<=" | ">" | ">=" | "in" | "!in" ) AdditiveExpr } ;
+AdditiveExpr        ::= MultiplicativeExpr { ( "+" | "-" ) MultiplicativeExpr } ;
+MultiplicativeExpr  ::= UnaryExpr { ( "*" | "/" | "%" ) UnaryExpr } ;
+UnaryExpr           ::= ( "not" | "-" ) UnaryExpr | PostfixExpr ;
+PostfixExpr         ::= PrimaryExpr { MemberAccess | CallExpr | IndexExpr } ;
+
+MemberAccess        ::= "." Ident ;
+CallExpr            ::= "(" [ ArgList ] ")" ;
+IndexExpr           ::= "[" Expression "]" ;
+
+PrimaryExpr         ::= Ident | Literal | ObjectLiteral | ListLiteral | "(" Expression ")" ;
+ObjectLiteral       ::= "{" [ FieldInitList ] "}" ;
+FieldInitList       ::= FieldInit { "," FieldInit } ;
+FieldInit           ::= Ident ":" Expression ;
+
+ListLiteral         ::= "[" [ ExprList ] "]" ;
+ArgList             ::= NamedArgList | ExprList ;
+NamedArgList        ::= NamedArg { "," NamedArg } ;
+NamedArg            ::= Ident "=" Expression ;
+ExprList            ::= Expression { "," Expression } ;
+
+Literal             ::= IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral | DurationLiteral | HashLiteral ;
+DurationLiteral     ::= IntegerLiteral ( "ms" | "s" | "m" | "h" | "d" ) ;
+HashLiteral         ::= "sha256:" HexString | "blake3:" HexString ;
+BoolLiteral         ::= "true" | "false" ;
+IntegerLiteral      ::= [ "-" ] DecDigit { DecDigit } | "0x" HexDigit { HexDigit } ;
+FloatLiteral        ::= [ "-" ] DecDigit { DecDigit } "." DecDigit { DecDigit } ;
+StringLiteral       ::= '"' { AnyCharExceptQuote } '"' ;
+Ident               ::= ( Alpha | "_" ) { AlphaNum | "_" } ;
+HexString           ::= HexDigit { HexDigit } ;
+DecDigit            ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+HexDigit            ::= DecDigit | "a" | "b" | "c" | "d" | "e" | "f" | "A" | "B" | "C" | "D" | "E" | "F" ;
+Alpha               ::= "a" ... "z" | "A" ... "Z" ;
+AlphaNum            ::= Alpha | DecDigit ;
